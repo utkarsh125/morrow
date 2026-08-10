@@ -1,0 +1,34 @@
+[package]
+name = "morrow"
+version = "0.1.0"
+edition = "2024"
+description = "Your private AI workspace, always on your machine."
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/utkarsh125/morrow"
+homepage = "https://github.com/utkarsh125/morrow"
+authors = ["utkarsh125"]
+keywords = ["ai", "tui", "ollama", "terminal", "llm"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "morrow"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["clock"] }
+clap = { version = "4", features = ["derive"] }
+crossterm = "0.28"
+directories = "6"
+futures-util = "0.3"
+pulldown-cmark = "0.12"
+ratatui = "0.29"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+toml = "0.8"
+uuid = { version = "1", features = ["v4", "serde"] }
