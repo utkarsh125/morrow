@@ -176,7 +176,9 @@ impl App {
             model_options,
             model_selected,
             theme_selected,
-            
+            temporary_mode: false,
+            temporary_conversations: HashSet::new(),
+            temporary_messages: HashMap::new(),
             provider,
             events: mpsc::unbounded_channel().1,
             partial: String::new(),
