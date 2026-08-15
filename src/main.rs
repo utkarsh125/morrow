@@ -69,7 +69,12 @@ async fn main() -> Result<()> {
             }
         }
 
-        
+        if (app.connection == Connection::Disconnected || app.model_options.is_empty())
+            && last_model_check.elapsed() > Duration::from_secs(3)
+        {
+            app.refresh_models().await;
+            last_model_check = std::time::Instant::now();
+        }
 
         app.poll_stream()?;
         app.advance_animation();
