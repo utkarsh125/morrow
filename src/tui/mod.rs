@@ -694,6 +694,55 @@ fn input_box(f: &mut Frame, a: Rect, app: &App, theme: &'static Theme) {
     f.render_widget(p, a);
 }
 
+fn render_autocomplete_popup(f: &mut Frame, input_rect: Rect, app: &App, theme: &'static Theme) {
+    let count = app.autocomplete_items.len().min(8) as u16;
+    let popup_height = count + 2;
+    let popup_y = input_rect.y.saturating_sub(popup_height);
+    let popup_width = 58.min(input_rect.width);
+    let popup_rect = Rect::new(input_rect.x + 2, popup_y, popup_width, popup_height);
+
+    f.render_widget(Clear, popup_rect);
+
+    let items: Vec<ListItem> = app
+        .autocomplete_items
+        .iter()
+        .take(8)
+        .enumerate()
+        .map(|(idx, spec)| {
+            let is_sel = idx == app.autocomplete_idx;
+            let pointer = if is_sel { "▶ " } else { "  " };
+            let style = if is_sel {
+                Style::default().fg(theme.accent).bold().bg(theme.surface)
+            } else {
+                Style::default().fg(theme.text)
+            };
+
+            let line = Line::from(vec![
+                Span::styled(pointer, Style::default().fg(theme.accent).bold()),
+                Span::styled(
+                    format!("{:<10} ", spec.name),
+                    Style::default().fg(theme.accent).bold(),
+                ),
+                Span::styled(
+                    format!("{:<8} ", spec.args),
+                    Style::default().fg(theme.warning),
+                ),
+                Span::styled(spec.description, Style::default().fg(theme.muted)),
+            ]);
+
+            ListItem::new(line).style(style)
+        })
+        .collect();
+
+    let list = List::new(items).block(rounded_block(
+        " COMMANDS (Tab: Apply · ↑↓: Select) ",
+        theme,
+        theme.accent,
+    ));
+
+    f.render_widget(list, popup_rect);
+}
+
 fn centered_rect(a: Rect, w: u16, h: u16) -> Rect {
     let vert = Layout::vertical([
         Constraint::Fill(1),
@@ -1232,6 +1281,88 @@ fn render_modal_system_prompt(f: &mut Frame, app: &App, theme: &'static Theme) {
             theme,
             theme.accent,
         ));
+
+    f.render_widget(p, a);
+}
+
+fn render_modal_stats(f: &mut Frame, app: &App, theme: &'static Theme) {
+    let a = centered_rect(f.area(), 68, 16);
+    f.render_widget(Clear, a);
+
+    let total_convs = app.db.count_conversations().unwrap_or(0);
+    let total_msgs = app.db.count_messages().unwrap_or(0);
+    let cur_tokens = app.total_tokens_in_current_chat();
+
+    let lines = vec![
+        Line::from(vec![Span::styled(
+            "MORROW SESSION TELEMETRY",
+            Style::default().fg(theme.accent).bold(),
+        )]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Active Model:         ", Style::default().fg(theme.muted)),
+            Span::styled(
+                &app.config.model,
+                Style::default().fg(theme.assistant).bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ollama Endpoint:      ", Style::default().fg(theme.muted)),
+            Span::styled(&app.config.ollama.url, Style::default().fg(theme.accent)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Connection Status:    ", Style::default().fg(theme.muted)),
+            Span::styled(
+                match app.connection {
+                    Connection::Connected => "Connected (Ready)",
+                    Connection::Generating => "Streaming Generation",
+                    Connection::Disconnected => "Offline / Unreachable",
+                },
+                Style::default()
+                    .fg(if app.connection == Connection::Connected {
+                        theme.success
+                    } else {
+                        theme.error
+                    })
+                    .bold(),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Current Session:      ", Style::default().fg(theme.muted)),
+            Span::styled(
+                format!("{} messages (~{} tokens)", app.messages.len(), cur_tokens),
+                Style::default().fg(theme.text),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Total Local Sessions: ", Style::default().fg(theme.muted)),
+            Span::styled(
+                format!(
+                    "{} conversations ({} messages in SQLite)",
+                    total_convs, total_msgs
+                ),
+                Style::default().fg(theme.text),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Active Theme:         ", Style::default().fg(theme.muted)),
+            Span::styled(
+                format!("{} (65+ available in repo)", theme.name),
+                Style::default().fg(theme.code_fg),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Press Esc or Enter to close.",
+            Style::default().fg(theme.muted).italic(),
+        )),
+    ];
+
+    let p = Paragraph::new(lines).block(rounded_block(
+        " TELEMETRY & SYSTEM STATS ",
+        theme,
+        theme.accent,
+    ));
 
     f.render_widget(p, a);
 }
