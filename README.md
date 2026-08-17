@@ -2,7 +2,7 @@
 
 > Your private AI workspace, always on your machine.
 
-Morrow is a calm, keyboard-first, Hermes-inspired terminal workspace for chatting with local language models through [Ollama](https://ollama.com). Conversations stay in a local SQLite database; Morrow has no accounts, telemetry, analytics, API keys, or cloud APIs.
+Morrow is a calm, keyboard-first, Hermes-inspired terminal workspace for chatting with local language models through [Ollama](https://ollama.com) or a local OpenAI-compatible server. Conversations stay in a local SQLite database; Morrow has no accounts, telemetry, analytics, API keys, or cloud APIs.
 
 ---
 
@@ -13,6 +13,8 @@ Morrow is a calm, keyboard-first, Hermes-inspired terminal workspace for chattin
 - **Interactive Slash Command Autocomplete**: Type `/` to bring up a floating autocomplete popup with instant command filtering, syntax hints, and descriptions.
 - **100% Local & Ephemeral Modes**: Switch seamlessly between persistent local SQLite storage and ephemeral incognito chat (`/temp` / `/temp off`).
 - **Export & Clipboard Tools**: Copy assistant answers directly to clipboard (`/copy` via OSC 52) or export entire conversation threads to Markdown and JSON (`/export md` / `/export json`).
+- **Local Provider Choice**: Use Ollama or a local OpenAI-compatible server such as LM Studio, llama.cpp, or LocalAI (`/provider`).
+- **Prompt Attachments & Motion Controls**: Add a local UTF-8 text file with `/attach <path>` and control streaming motion with `/animations on|off`.
 
 ---
 
@@ -70,7 +72,7 @@ Morrow creates its configuration at `~/.config/morrow/config.toml` and its histo
 
 | Key | Action |
 | --- | --- |
-| `Ctrl-S` / `Ctrl-Enter` | Send message |
+| `Ctrl-S` / `Ctrl-Enter` (`Cmd-S` / `Cmd-Enter` on macOS terminals that forward Command) | Send message |
 | `Enter` | Insert newline (or execute single-line command) |
 | `Tab` | Autocomplete slash command / indent |
 | `Ctrl-N` | Start new conversation session |
@@ -110,6 +112,9 @@ Morrow creates its configuration at `~/.config/morrow/config.toml` and its histo
 | `/stop` | | Abort active streaming generation |
 | `/stats` | | View session telemetry, tokens, DB and Ollama info |
 | `/url` | `[url]` | View or change Ollama server endpoint |
+| `/provider` | `[ollama\|local]` | Switch between Ollama and a local OpenAI-compatible server |
+| `/attach` | `<path>` | Add a local UTF-8 text file (up to 256 KiB) to the next prompt |
+| `/animations` | `[on\|off]` | Toggle streaming/loading animations |
 | `/bye`, `/quit` | | Exit Morrow |
 
 ---
@@ -140,7 +145,7 @@ Switch live with `Ctrl-T` or `/theme <name>`. Your selection persists across res
 
 ## Privacy & Security
 
-Morrow only communicates with the Ollama URL configured locally (default: `http://localhost:11434`). It has zero telemetry, zero cloud tracking, and never sends conversation data outside your machine.
+Morrow only communicates with the configured local provider: Ollama by default (`http://localhost:11434`) or an OpenAI-compatible local server (`http://localhost:1234/v1`). It has zero telemetry, zero cloud tracking, and never sends conversation data outside your machine.
 
 ---
 

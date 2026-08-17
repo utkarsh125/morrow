@@ -1,6 +1,6 @@
 use crate::{
     commands::{self, Command, CommandSpec},
-    config::{self, Config},
+    config::{self, Config, ProviderKind},
     db::Database,
     models::{Conversation, Message, Role, estimate_tokens, title_from},
     providers::{LlmProvider, StreamEvent},
@@ -137,7 +137,7 @@ impl App {
 
         let notice = if model_options.is_empty() {
             Some((
-                "No models detected, make sure Ollama is running (`ollama serve`).".into(),
+                "No local models detected. Check the selected provider and server URL.".into(),
                 Instant::now(),
             ))
         } else {
@@ -429,7 +429,9 @@ impl App {
         }
 
         if self.model_options.is_empty() {
-            self.set_notice("No models detected, make sure Ollama is running.");
+            self.set_notice(
+                "No local models detected. Check the selected provider and server URL.",
+            );
             return Ok(());
         }
 
@@ -570,7 +572,7 @@ impl App {
     }
 
     pub fn advance_animation(&mut self) {
-        if self.connection == Connection::Generating {
+        if self.connection == Connection::Generating && self.config.ui.animations {
             self.animation_frame = self.animation_frame.wrapping_add(1);
             self.dirty = true;
         }
@@ -877,14 +879,95 @@ impl App {
 
     pub fn set_url(&mut self, url: Option<String>) -> Result<()> {
         if let Some(new_url) = url {
-            self.config.ollama.url = new_url.clone();
-            self.provider = Arc::new(crate::providers::ollama::Ollama::new(new_url.clone()));
+            match self.config.provider.kind {
+                ProviderKind::Ollama => self.config.ollama.url = new_url.clone(),
+                ProviderKind::OpenAiCompatible => {
+                    self.config.openai_compatible.url = new_url.clone()
+                }
+            }
+            self.provider = crate::providers::from_config(&self.config);
             let _ = config::save(&self.config);
-            self.set_notice(format!("Ollama URL set to: {}", new_url));
+            self.set_notice(format!("Local provider URL set to: {}", new_url));
         } else {
-            self.set_notice(format!("Ollama endpoint: {}", self.config.ollama.url));
+            self.set_notice(format!("Local provider endpoint: {}", self.provider.url()));
         }
         self.dirty = true;
+        Ok(())
+    }
+
+    pub fn set_provider(&mut self, value: Option<String>) -> Result<()> {
+        let Some(value) = value else {
+            self.set_notice("Provider: use /provider ollama or /provider local.");
+            return Ok(());
+        };
+        let kind = match value.to_lowercase().as_str() {
+            "ollama" => ProviderKind::Ollama,
+            "local" | "openai-compatible" | "openai" | "lmstudio" | "llamacpp" => {
+                ProviderKind::OpenAiCompatible
+            }
+            _ => {
+                self.set_notice("Usage: /provider [ollama|local]");
+                return Ok(());
+            }
+        };
+        self.config.provider.kind = kind;
+        self.provider = crate::providers::from_config(&self.config);
+        self.model_options.clear();
+        self.connection = Connection::Disconnected;
+        let _ = config::save(&self.config);
+        self.set_notice(format!(
+            "Provider switched to {}. Checking local server…",
+            value
+        ));
+        Ok(())
+    }
+
+    pub fn attach_file(&mut self, value: Option<String>) -> Result<()> {
+        let Some(path) = value else {
+            self.set_notice("Usage: /attach <path-to-text-file>");
+            return Ok(());
+        };
+        let metadata = fs::metadata(&path)?;
+        if !metadata.is_file() {
+            self.set_notice("Attachments must be regular local files.");
+            return Ok(());
+        }
+        if metadata.len() > 256 * 1024 {
+            self.set_notice("Attachment is too large (limit: 256 KiB).");
+            return Ok(());
+        }
+        let contents = fs::read_to_string(&path)
+            .map_err(|_| anyhow::anyhow!("Attachment must be UTF-8 text."))?;
+        let name = std::path::Path::new(&path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("attachment");
+        let attachment =
+            format!("\n\n--- Attached file: {name} ---\n{contents}\n--- End attachment ---\n");
+        self.input.push_str(&attachment);
+        self.cursor = self.input.len();
+        self.update_autocomplete();
+        self.set_notice(format!("Attached {name}. Add a question, then send."));
+        Ok(())
+    }
+
+    pub fn set_animations(&mut self, value: Option<String>) -> Result<()> {
+        let next = match value.as_deref().map(str::to_lowercase).as_deref() {
+            Some("on") | Some("true") | Some("1") => true,
+            Some("off") | Some("false") | Some("0") => false,
+            Some(_) => {
+                self.set_notice("Usage: /animations [on|off]");
+                return Ok(());
+            }
+            None => !self.config.ui.animations,
+        };
+        self.config.ui.animations = next;
+        let _ = config::save(&self.config);
+        self.set_notice(if next {
+            "Animations enabled."
+        } else {
+            "Animations disabled."
+        });
         Ok(())
     }
 
@@ -988,6 +1071,9 @@ impl App {
                 self.modal = Modal::Stats;
             }
             Ok(Command::Url(val)) => self.set_url(val)?,
+            Ok(Command::Provider(value)) => self.set_provider(value)?,
+            Ok(Command::Attach(value)) => self.attach_file(value)?,
+            Ok(Command::Animations(value)) => self.set_animations(value)?,
             Ok(Command::Bye) => {
                 self.set_notice("See you soon. Your conversations are safely local.");
                 self.should_quit = true;
@@ -1271,6 +1357,6 @@ mod tests {
         assert_eq!(app.messages.len(), 0);
         assert_eq!(app.input, "Explain quantum physics");
         let (notice_msg, _) = app.notice.unwrap();
-        assert!(notice_msg.contains("No models detected, make sure Ollama is running"));
+        assert!(notice_msg.contains("No local models detected"));
     }
 }
