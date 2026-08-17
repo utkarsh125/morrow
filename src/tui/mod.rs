@@ -150,8 +150,15 @@ fn header(f: &mut Frame, a: Rect, app: &App, theme: &'static Theme) {
     );
 
     // Right status
+    let provider_name = match app.config.provider.kind {
+        crate::config::ProviderKind::Ollama => "Ollama",
+        crate::config::ProviderKind::OpenAiCompatible => "Local API",
+    };
     let status_text = Line::from(vec![
-        Span::styled("Ollama  ", Style::default().fg(theme.muted)),
+        Span::styled(
+            format!("{provider_name}  "),
+            Style::default().fg(theme.muted),
+        ),
         Span::styled(state_badge.0, Style::default().fg(state_badge.1).bold()),
     ]);
     f.render_widget(
@@ -343,7 +350,7 @@ fn chat(f: &mut Frame, a: Rect, app: &App, theme: &'static Theme) {
             ]),
             Line::from(""),
             Line::from(Span::styled(
-                "   Type your question below and press Ctrl-S (or Ctrl-Enter) to send.",
+                "   Type your question below and press Ctrl-S (or Cmd-S on macOS) to send.",
                 Style::default().fg(theme.muted).italic(),
             )),
             Line::from(""),
@@ -644,7 +651,7 @@ fn status_bar(f: &mut Frame, a: Rect, app: &App, theme: &'static Theme) {
     };
 
     let right_spans = vec![
-        Span::styled("Ctrl-S: Send  ", Style::default().fg(theme.muted)),
+        Span::styled("Ctrl/Cmd-S: Send  ", Style::default().fg(theme.muted)),
         Span::styled("Tab: Auto  ", Style::default().fg(theme.muted)),
         Span::styled("Ctrl-T: Themes  ", Style::default().fg(theme.muted)),
         Span::styled("Ctrl-N: New  ", Style::default().fg(theme.muted)),
@@ -670,7 +677,7 @@ fn input_box(f: &mut Frame, a: Rect, app: &App, theme: &'static Theme) {
     };
 
     let display_text = if app.input.is_empty() {
-        "Ask Morrow anything... (Ctrl-S to send, / for slash commands)"
+        "Ask Morrow anything... (Ctrl/Cmd-S to send, / for slash commands)"
     } else {
         &app.input
     };
@@ -782,7 +789,7 @@ fn render_modal_help(f: &mut Frame, app: &App, theme: &'static Theme) {
         (
             "/model",
             "[name]",
-            "Switch or browse local Ollama LLM models",
+            "Switch or browse models from the selected local provider",
         ),
         (
             "/theme",
@@ -821,8 +828,19 @@ fn render_modal_help(f: &mut Frame, app: &App, theme: &'static Theme) {
         ),
         ("/retry", "", "Regenerate the last response"),
         ("/stop", "", "Abort active generation stream"),
-        ("/stats", "", "View telemetry, tokens, DB and Ollama info"),
-        ("/url", "[url]", "View or configure Ollama server URL"),
+        ("/provider", "[ollama|local]", "Choose a local model server"),
+        ("/url", "[url]", "View or configure selected provider URL"),
+        (
+            "/attach",
+            "<path>",
+            "Add a local UTF-8 text file to the prompt",
+        ),
+        ("/animations", "[on|off]", "Toggle streaming animations"),
+        (
+            "/stats",
+            "",
+            "View telemetry, tokens, database, and provider info",
+        ),
         ("/bye, /quit", "", "Exit Morrow"),
     ];
 
@@ -844,7 +862,10 @@ fn render_modal_help(f: &mut Frame, app: &App, theme: &'static Theme) {
             Style::default().fg(theme.assistant).bold(),
         )]),
         Line::from(vec![
-            Span::styled("  Ctrl-S / Ctrl-Enter: ", Style::default().fg(theme.muted)),
+            Span::styled(
+                "  Ctrl/Cmd-S / Ctrl/Cmd-Enter: ",
+                Style::default().fg(theme.muted),
+            ),
             Span::styled("Send message    ", Style::default().fg(theme.text)),
             Span::styled("Ctrl-N: ", Style::default().fg(theme.muted)),
             Span::styled("New chat    ", Style::default().fg(theme.text)),
@@ -1292,6 +1313,7 @@ fn render_modal_stats(f: &mut Frame, app: &App, theme: &'static Theme) {
     let total_convs = app.db.count_conversations().unwrap_or(0);
     let total_msgs = app.db.count_messages().unwrap_or(0);
     let cur_tokens = app.total_tokens_in_current_chat();
+    let provider_url = app.provider.url();
 
     let lines = vec![
         Line::from(vec![Span::styled(
@@ -1307,8 +1329,8 @@ fn render_modal_stats(f: &mut Frame, app: &App, theme: &'static Theme) {
             ),
         ]),
         Line::from(vec![
-            Span::styled("  Ollama Endpoint:      ", Style::default().fg(theme.muted)),
-            Span::styled(&app.config.ollama.url, Style::default().fg(theme.accent)),
+            Span::styled("  Local Provider:       ", Style::default().fg(theme.muted)),
+            Span::styled(&provider_url, Style::default().fg(theme.accent)),
         ]),
         Line::from(vec![
             Span::styled("  Connection Status:    ", Style::default().fg(theme.muted)),

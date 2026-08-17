@@ -16,9 +16,8 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use db::Database;
-use providers::ollama::Ollama;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use std::{io, sync::Arc, time::Duration};
+use std::{io, time::Duration};
 
 #[derive(Parser)]
 #[command(
@@ -51,7 +50,7 @@ async fn main() -> Result<()> {
     let config = config::load_or_create()?;
     let (_, db_path) = config::paths()?;
     let db = Database::open(&db_path)?;
-    let provider = Arc::new(Ollama::new(config.ollama.url.clone()));
+    let provider = providers::from_config(&config);
     let mut app = App::new(config, db, provider).await?;
 
     let _guard = TerminalGuard::enter()?;
@@ -89,8 +88,14 @@ async fn main() -> Result<()> {
 }
 
 fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
-    // Global interrupt: Ctrl-C
-    if key.modifiers.contains(KeyModifiers::CONTROL) && matches!(key.code, KeyCode::Char('c')) {
+    // macOS terminal emulators that forward Command report it as SUPER. Treat it
+    // as the platform-equivalent shortcut modifier alongside Control.
+    let shortcut_modifier = key
+        .modifiers
+        .intersects(KeyModifiers::CONTROL | KeyModifiers::SUPER);
+
+    // Global interrupt: Ctrl-C / Cmd-C
+    if shortcut_modifier && matches!(key.code, KeyCode::Char('c')) {
         if app.connection == Connection::Generating {
             app.stop_generation()?;
             return Ok(());
@@ -275,7 +280,7 @@ fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
             KeyCode::Esc => {
                 app.modal = Modal::None;
             }
-            KeyCode::Enter if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Enter if shortcut_modifier => {
                 app.confirm_modal()?;
             }
             KeyCode::Enter => {
@@ -337,7 +342,7 @@ fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
             }
 
             // Control modifier shortcuts
-            if key.modifiers.contains(KeyModifiers::CONTROL) {
+            if shortcut_modifier {
                 match key.code {
                     KeyCode::Char('n') => {
                         app.new_conversation()?;

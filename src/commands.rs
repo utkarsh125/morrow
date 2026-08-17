@@ -19,6 +19,9 @@ pub enum Command {
     Stop,
     Stats,
     Url(Option<String>),
+    Provider(Option<String>),
+    Attach(Option<String>),
+    Animations(Option<String>),
     Bye,
     Quit,
 }
@@ -33,6 +36,24 @@ pub struct CommandSpec {
 }
 
 pub static COMMAND_SPECS: &[CommandSpec] = &[
+    CommandSpec {
+        name: "/provider",
+        args: "[ollama|local]",
+        description: "Choose Ollama or a local OpenAI-compatible server",
+        category: "Model",
+    },
+    CommandSpec {
+        name: "/attach",
+        args: "<path>",
+        description: "Attach a local text file to the next message",
+        category: "Tools",
+    },
+    CommandSpec {
+        name: "/animations",
+        args: "[on|off]",
+        description: "Toggle streaming and loading animations",
+        category: "Appearance",
+    },
     CommandSpec {
         name: "/help",
         args: "",
@@ -192,6 +213,9 @@ pub fn parse(input: &str) -> Result<Command, String> {
         "/stop" | "/abort" | "/cancel" => Ok(Command::Stop),
         "/stats" | "/info" | "/status" => Ok(Command::Stats),
         "/url" | "/endpoint" | "/host" => Ok(Command::Url(arg)),
+        "/provider" | "/backend" => Ok(Command::Provider(arg)),
+        "/attach" | "/file" => Ok(Command::Attach(arg)),
+        "/animations" | "/motion" => Ok(Command::Animations(arg)),
         "/bye" => Ok(Command::Bye),
         "/quit" | "/q" | "/exit" => Ok(Command::Quit),
         _ => Err(format!(
@@ -266,6 +290,18 @@ mod tests {
         assert_eq!(parse("/export md"), Ok(Command::Export(Some("md".into()))));
         assert_eq!(parse("/retry"), Ok(Command::Retry));
         assert_eq!(parse("/stop"), Ok(Command::Stop));
+        assert_eq!(
+            parse("/provider local"),
+            Ok(Command::Provider(Some("local".into())))
+        );
+        assert_eq!(
+            parse("/attach notes.md"),
+            Ok(Command::Attach(Some("notes.md".into())))
+        );
+        assert_eq!(
+            parse("/animations off"),
+            Ok(Command::Animations(Some("off".into())))
+        );
         assert_eq!(parse("/stats"), Ok(Command::Stats));
         assert_eq!(
             parse("/url http://127.0.0.1:11434"),
